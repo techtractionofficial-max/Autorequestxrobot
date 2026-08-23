@@ -75,18 +75,12 @@ async def reveal_vip_link(call: CallbackQuery):
     except Exception:
         pass
     
-    # 2. Fetch the correct VIP link for this specific channel
-    channel_id = int(call.data.split("_")[1])
-    channel_data = await db.get_channel(channel_id)
-    
+    # ==========================================
+    # 🛠️ PUT YOUR ACTUAL VIP LINK HERE
+    # ==========================================
     btn_text = "🔥 Join VIP Channel"
-    btn_url = "https://t.me/+zplxZ63hjiI0MzE1" # Default fallback
-    
-    if channel_data:
-        _, _, _, _, _, db_btn_text, db_btn_url = channel_data
-        if db_btn_text and db_btn_url:
-            btn_text = db_btn_text
-            btn_url = db_btn_url
+    btn_url = "https://t.me/+zplxZ63hjiI0MzE1"  # <--- Change this to your link!
+    # ==========================================
 
     # 3. Give them the actual URL link in a small, clean message
     final_keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -99,6 +93,7 @@ async def reveal_vip_link(call: CallbackQuery):
         reply_markup=final_keyboard
     )
     await call.answer()
+    
 
 
 # ==========================================
