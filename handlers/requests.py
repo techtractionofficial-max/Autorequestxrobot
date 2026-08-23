@@ -10,10 +10,8 @@ router = Router()
 
 @router.chat_join_request()
 async def join_request_handler(event: ChatJoinRequest):
-    """Listens for join requests, registers user, triggers promo DM, and auto-approves."""
     user = event.from_user
     chat = event.chat
-    bot_info = await event.bot.get_me()
 
     # 1. Register user in database
     await db.register_user(
@@ -27,32 +25,31 @@ async def join_request_handler(event: ChatJoinRequest):
     if not channel_data:
         await db.add_channel(channel_id=chat.id, owner_id=user.id, title=chat.title)
         auto_approve = 1
-        custom_dm = "<b>Hello {name}!</b> 🎉\n\nYour request has been approved.\nCheck out our sponsors below:"
-        btn_text = "🔥 Join 18+ VIP Channel"
-        btn_url = "https://t.me/+zplxZ63hjiI0MzE1"
     else:
-        _, _, _, auto_approve, custom_dm, btn_text, btn_url = channel_data
+        _, _, _, auto_approve, _, _, _ = channel_data
 
-    # 3. Deliver Promotional Photo Message
+    # CUSTOMIZE GREETING TEXT HERE
+    custom_dm = (
+        f"<b>Hello {user.first_name}!</b> 🎉\n\n"
+        "Your request has been approved. Welcome to our official community!\n\n"
+        "<i>Tap the button below to get your VIP link:</i>"
+    )
+
     try:
-        # We add a SECOND button to force them to interact with the bot so broadcasting works later
+        # We send a callback button. When they click this, they get locked in for broadcasts!
         promo_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=btn_text, url=btn_url)],
-            [InlineKeyboardButton(text="🎁 Get 18+ VIP Access (Start Bot)", url=f"https://t.me/{bot_info.username}?start=bonus")]
+            [InlineKeyboardButton(text="🎁 Tap to Reveal VIP Link", callback_data=f"vip_{chat.id}")]
         ])
         
-        formatted_dm = custom_dm.replace("{name}", user.first_name or "there")
-        
-        # Send Photo instead of just text
         await event.bot.send_photo(
             chat_id=user.id,
             photo=config.WELCOME_PHOTO_URL,
-            caption=formatted_dm,
+            caption=custom_dm,
             parse_mode="HTML",
             reply_markup=promo_keyboard
         )
     except (TelegramForbiddenError, Exception):
-        pass  # User has blocked DMs from bots
+        pass  
 
     # 4. Handle Approval
     if auto_approve:
@@ -67,7 +64,46 @@ async def join_request_handler(event: ChatJoinRequest):
         await db.add_pending_request(channel_id=chat.id, user_id=user.id)
 
 
-# FIXED: Approve All Requests Button
+# ==========================================
+# ⚡ THE MAGIC REVEAL AND DELETE FUNCTION
+# ==========================================
+@router.callback_query(F.data.startswith("vip_"))
+async def reveal_vip_link(call: CallbackQuery):
+    # 1. Instantly delete the massive greeting photo
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
+    
+    # 2. Fetch the correct VIP link for this specific channel
+    channel_id = int(call.data.split("_")[1])
+    channel_data = await db.get_channel(channel_id)
+    
+    btn_text = "🔥 Join VIP Channel"
+    btn_url = "https://t.me/Telegram" # Default fallback
+    
+    if channel_data:
+        _, _, _, _, _, db_btn_text, db_btn_url = channel_data
+        if db_btn_text and db_btn_url:
+            btn_text = db_btn_text
+            btn_url = db_btn_url
+
+    # 3. Give them the actual URL link in a small, clean message
+    final_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=btn_text, url=btn_url)]
+    ])
+    
+    await call.message.answer(
+        "<b>✅ Access Granted!</b>\n\nClick below to join:",
+        parse_mode="HTML",
+        reply_markup=final_keyboard
+    )
+    await call.answer()
+
+
+# ==========================================
+# MANUAL APPROVAL COMMANDS
+# ==========================================
 @router.callback_query(F.data == "btn_approve_all")
 async def approve_all_cb(call: CallbackQuery):
     await call.answer(
@@ -75,13 +111,10 @@ async def approve_all_cb(call: CallbackQuery):
         show_alert=True
     )
 
-
 @router.message(Command("approve"))
 async def manual_approve_cmd(message: Message):
-    """Executes high-speed batch approval for stored requests."""
     args = message.text.split()
     limit = int(args[1]) if len(args) > 1 and args[1].isdigit() else 100
-
     chat_id = message.chat.id
     user_ids = await db.get_pending_requests(channel_id=chat_id, limit=limit)
 
@@ -89,11 +122,7 @@ async def manual_approve_cmd(message: Message):
         await message.reply("<b>❌ No pending requests found in queue for this channel.</b>", parse_mode="HTML")
         return
 
-    status_msg = await message.reply(
-        f"<b>⚡ Approving {len(user_ids)} requests...</b>",
-        parse_mode="HTML"
-    )
-
+    status_msg = await message.reply(f"<b>⚡ Approving {len(user_ids)} requests...</b>", parse_mode="HTML")
     approved_count = 0
     approved_list = []
 
@@ -121,5 +150,5 @@ async def manual_approve_cmd(message: Message):
         f"• <b>Approved:</b> <code>{approved_count}</code> users\n"
         f"• <b>Remaining:</b> <code>{len(user_ids) - approved_count}</code>",
         parse_mode="HTML"
-    )
+        )
     
