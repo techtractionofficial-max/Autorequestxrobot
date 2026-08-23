@@ -14,9 +14,8 @@ class Config:
     BROADCAST_BATCH_SIZE: int = 25
     BROADCAST_DELAY_SECONDS: float = 0.04  # ~25 messages/second
 
-config = Config()
-
-    # Add these below your existing variables in config.py
+    # Images
     START_PHOTO_URL: str = "https://t.me/photouploadhere/21"
     WELCOME_PHOTO_URL: str = "https://t.me/photouploadhere/22"
 
+config = Config()
