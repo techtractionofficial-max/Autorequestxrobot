@@ -38,7 +38,7 @@ async def join_request_handler(event: ChatJoinRequest):
         # We add a SECOND button to force them to interact with the bot so broadcasting works later
         promo_keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text=btn_text, url=btn_url)],
-            [InlineKeyboardButton(text="🎁 Get VIP Access (Start Bot)", url=f"https://t.me/{bot_info.username}?start=bonus")]
+            [InlineKeyboardButton(text="🎁 Get 18+ VIP Access (Start Bot)", url=f"https://t.me/{bot_info.username}?start=bonus")]
         ])
         
         formatted_dm = custom_dm.replace("{name}", user.first_name or "there")
