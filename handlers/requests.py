@@ -80,7 +80,7 @@ async def reveal_vip_link(call: CallbackQuery):
     channel_data = await db.get_channel(channel_id)
     
     btn_text = "🔥 Join VIP Channel"
-    btn_url = "https://t.me/Telegram" # Default fallback
+    btn_url = "https://t.me/+zplxZ63hjiI0MzE1" # Default fallback
     
     if channel_data:
         _, _, _, _, _, db_btn_text, db_btn_url = channel_data
