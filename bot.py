@@ -26,10 +26,13 @@ async def main():
 
     logging.info("Bot engine initialized. Starting polling...")
     try:
+        # 🔥 THE FIX: This forces Telegram to delete old webhooks/connections
+        await bot.delete_webhook(drop_pending_updates=True)
+        
         await dp.start_polling(bot, allowed_updates=["message", "chat_join_request", "callback_query"])
     finally:
         await bot.session.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
-  
+    
