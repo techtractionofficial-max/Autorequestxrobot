@@ -31,41 +31,62 @@ async def start_broadcast(call: CallbackQuery, state: FSMContext):
     await state.set_state(BroadcastState.waiting_for_content)
     await call.answer()
 
+
+# ==========================================
+# 📊 NEW GLOBAL ANALYTICS BUTTON HANDLER
+# ==========================================
+@router.callback_query(F.data == "admin_stats", F.from_user.id.in_(config.ADMIN_IDS))
+async def admin_stats_callback(call: CallbackQuery):
+    stats = await db.get_global_stats()
+    text = (
+        "<b>📊 Global Engine Statistics</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"• <b>Active Channels:</b> <code>{stats['total_channels']}</code>\n"
+        f"• <b>Indexed Users:</b> <code>{stats['total_users']}</code>\n"
+        f"• <b>Pending Requests Queue:</b> <code>{stats['pending_requests']}</code>\n\n"
+        "🟢 <b>Status:</b> <i>Online & Running at Maximum Speed</i>"
+    )
+    await call.message.edit_text(text, parse_mode="HTML", reply_markup=get_admin_panel_keyboard())
+    await call.answer()
+
+
+# ==========================================
+# 📢 UPDATED BROADCAST PREVIEW HANDLER
+# ==========================================
 @router.message(BroadcastState.waiting_for_content, F.from_user.id.in_(config.ADMIN_IDS))
 async def process_broadcast_preview(message: Message, state: FSMContext):
     caption = message.caption or message.text or ""
     clean_text, reply_markup = parse_broadcast_buttons(caption)
     
-    await state.update_data(
-        message_id=message.message_id,
-        chat_id=message.chat.id,
-        clean_text=clean_text,
-        has_buttons=bool(reply_markup)
-    )
-
     await message.answer("<b>👁️ Previewing Broadcast Output:</b>", parse_mode="HTML")
     
-    # Render preview
+    # Send preview and CAPTURE the bot's rendered message
     if message.photo:
-        await message.answer_photo(
+        preview_msg = await message.answer_photo(
             photo=message.photo[-1].file_id,
             caption=clean_text,
             parse_mode="HTML",
             reply_markup=reply_markup
         )
     elif message.video:
-        await message.answer_video(
+        preview_msg = await message.answer_video(
             video=message.video.file_id,
             caption=clean_text,
             parse_mode="HTML",
             reply_markup=reply_markup
         )
     else:
-        await message.answer(
+        preview_msg = await message.answer(
             text=clean_text,
             parse_mode="HTML",
             reply_markup=reply_markup
         )
+
+    # FIXED: Save the preview_msg ID so it sends with the rendered buttons
+    await state.update_data(
+        message_id=preview_msg.message_id,
+        chat_id=preview_msg.chat.id
+    )
 
     users = await db.get_all_active_users()
     confirm_text = (
@@ -77,6 +98,10 @@ async def process_broadcast_preview(message: Message, state: FSMContext):
     await message.answer(confirm_text, parse_mode="HTML")
     await state.set_state(BroadcastState.confirm_dispatch)
 
+
+# ==========================================
+# 🚀 BROADCAST EXECUTION ENGINE
+# ==========================================
 @router.message(BroadcastState.confirm_dispatch, F.text.casefold() == "yes", F.from_user.id.in_(config.ADMIN_IDS))
 async def execute_broadcast(message: Message, state: FSMContext):
     data = await state.get_data()
@@ -180,4 +205,4 @@ async def export_users_csv(call: CallbackQuery):
         parse_mode="HTML"
     )
     await call.answer()
-  
+    
