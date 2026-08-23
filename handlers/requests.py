@@ -28,8 +28,8 @@ async def join_request_handler(event: ChatJoinRequest):
         await db.add_channel(channel_id=chat.id, owner_id=user.id, title=chat.title)
         auto_approve = 1
         custom_dm = "<b>Hello {name}!</b> 🎉\n\nYour request has been approved.\nCheck out our sponsors below:"
-        btn_text = "🔥 Join VIP Channel"
-        btn_url = "https://t.me/Telegram"
+        btn_text = "🔥 Join 18+ VIP Channel"
+        btn_url = "https://t.me/+zplxZ63hjiI0MzE1"
     else:
         _, _, _, auto_approve, custom_dm, btn_text, btn_url = channel_data
 
