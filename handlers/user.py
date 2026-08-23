@@ -22,8 +22,8 @@ async def start_handler(message: Message):
     
     # Custom Inline Buttons for your channels (Not Forced)
     start_buttons = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📢 Join Official Channel 1", url="https://t.me/Telegram")],
-        [InlineKeyboardButton(text="📢 Join Official Channel 2", url="https://t.me/Telegram")]
+        [InlineKeyboardButton(text="📢 Join Official Channel 1", url="https://t.me/+zplxZ63hjiI0MzE1")],
+        [InlineKeyboardButton(text="📢 Join Official Channel 2", url="https://t.me/cybersecmastery")]
     ])
     
     caption = (
