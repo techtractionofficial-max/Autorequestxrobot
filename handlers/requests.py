@@ -1,9 +1,10 @@
 import asyncio
 from aiogram import Router, F
-from aiogram.types import ChatJoinRequest, Message, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import ChatJoinRequest, Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 from aiogram.exceptions import TelegramRetryAfter, TelegramForbiddenError
 from database import db
+from config import config
 
 router = Router()
 
@@ -12,8 +13,9 @@ async def join_request_handler(event: ChatJoinRequest):
     """Listens for join requests, registers user, triggers promo DM, and auto-approves."""
     user = event.from_user
     chat = event.chat
+    bot_info = await event.bot.get_me()
 
-    # 1. Register or update user in database
+    # 1. Register user in database
     await db.register_user(
         user_id=user.id,
         first_name=user.first_name,
@@ -22,33 +24,37 @@ async def join_request_handler(event: ChatJoinRequest):
 
     # 2. Retrieve channel settings
     channel_data = await db.get_channel(chat.id)
-    
     if not channel_data:
-        # Default auto-save channel configuration
         await db.add_channel(channel_id=chat.id, owner_id=user.id, title=chat.title)
         auto_approve = 1
-        custom_dm = "<b>Hello {name}!</b> 🎉\n\nYour request has been approved.\nJoin our exclusive channel below:"
+        custom_dm = "<b>Hello {name}!</b> 🎉\n\nYour request has been approved.\nCheck out our sponsors below:"
         btn_text = "🔥 Join VIP Channel"
         btn_url = "https://t.me/Telegram"
     else:
         _, _, _, auto_approve, custom_dm, btn_text, btn_url = channel_data
 
-    # 3. Deliver Promotional Direct Message
+    # 3. Deliver Promotional Photo Message
     try:
-        promo_keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(text=btn_text, url=btn_url)]]
-        )
+        # We add a SECOND button to force them to interact with the bot so broadcasting works later
+        promo_keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=btn_text, url=btn_url)],
+            [InlineKeyboardButton(text="🎁 Get VIP Access (Start Bot)", url=f"https://t.me/{bot_info.username}?start=bonus")]
+        ])
+        
         formatted_dm = custom_dm.replace("{name}", user.first_name or "there")
-        await event.bot.send_message(
+        
+        # Send Photo instead of just text
+        await event.bot.send_photo(
             chat_id=user.id,
-            text=formatted_dm,
+            photo=config.WELCOME_PHOTO_URL,
+            caption=formatted_dm,
             parse_mode="HTML",
             reply_markup=promo_keyboard
         )
     except (TelegramForbiddenError, Exception):
         pass  # User has blocked DMs from bots
 
-    # 4. Handle Approval / Queuing
+    # 4. Handle Approval
     if auto_approve:
         try:
             await event.approve()
@@ -59,6 +65,16 @@ async def join_request_handler(event: ChatJoinRequest):
             pass
     else:
         await db.add_pending_request(channel_id=chat.id, user_id=user.id)
+
+
+# FIXED: Approve All Requests Button
+@router.callback_query(F.data == "btn_approve_all")
+async def approve_all_cb(call: CallbackQuery):
+    await call.answer(
+        "⚡ High-Speed Mode:\nTo approve requests, go to your specific Telegram Channel/Group and type:\n\n/approve 100", 
+        show_alert=True
+    )
+
 
 @router.message(Command("approve"))
 async def manual_approve_cmd(message: Message):
@@ -86,7 +102,7 @@ async def manual_approve_cmd(message: Message):
             await message.bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
             approved_count += 1
             approved_list.append(user_id)
-            await asyncio.sleep(0.04)  # Safe speed rate limiter
+            await asyncio.sleep(0.04) 
         except TelegramRetryAfter as e:
             await asyncio.sleep(e.retry_after)
             try:
@@ -106,4 +122,4 @@ async def manual_approve_cmd(message: Message):
         f"• <b>Remaining:</b> <code>{len(user_ids) - approved_count}</code>",
         parse_mode="HTML"
     )
-  
+    
